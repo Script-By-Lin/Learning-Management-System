@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatDateString } from '@/utils/date';
+import ConfirmModal from '@/components/ConfirmModal';
 
 interface Lesson {
   id: string;
@@ -34,10 +35,13 @@ interface Course {
   price: number;
   level: string;
   createdAt: string;
+  updatedAt?: string | null;
   faq?: string | null;
   instructorName?: string | null;
   instructorBio?: string | null;
   instructorAvatarUrl?: string | null;
+  outcomes?: string | null;
+  requirements?: string | null;
 }
 
 interface SyllabusData {
@@ -72,6 +76,47 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
   // Toggle active accordion modules
   const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+
+  // Custom Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmOnly?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmOnly: false,
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (config: Omit<typeof confirmConfig, 'isOpen'>) => {
+    setConfirmConfig({
+      ...config,
+      isOpen: true
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const showAlert = (title: string, message: string, type: 'info' | 'warning' | 'danger' = 'info') => {
+    setConfirmConfig({
+      title,
+      message,
+      type,
+      confirmLabel: 'OK',
+      confirmOnly: true,
+      isOpen: true,
+      onConfirm: () => closeConfirm(),
+    });
+  };
 
   useEffect(() => {
     async function loadSyllabus() {
@@ -155,7 +200,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     }
 
     if (user.role !== 'STUDENT') {
-      alert('Only students can enroll in courses.');
+      showAlert('Enrollment Restricted', 'Only students can enroll in courses.', 'warning');
       return;
     }
 
@@ -165,10 +210,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       if (res.success) {
         setEnrolled(true);
       } else {
-        alert(res.error || 'Failed to enroll in the course.');
+        showAlert('Enrollment Failed', res.error || 'Failed to enroll in the course.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'Error occurred during enrollment.');
+      showAlert('Enrollment Error', err.message || 'Error occurred during enrollment.', 'danger');
     } finally {
       setEnrolling(false);
     }
@@ -181,7 +226,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     }
 
     if (user.role !== 'STUDENT') {
-      alert('Only students can enroll in courses.');
+      showAlert('Enrollment Restricted', 'Only students can enroll in courses.', 'warning');
       return;
     }
 
@@ -195,7 +240,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const handleUploadReceiptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!receiptFile) {
-      alert('Please select a receipt image to upload.');
+      showAlert('Receipt Required', 'Please select a receipt image to upload.', 'warning');
       return;
     }
 
@@ -203,17 +248,17 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
       setSubmittingReceipt(true);
       const res = await courseService.submitOfflinePayment(courseId, String(course.price), receiptFile);
       if (res.success) {
-        alert('Payment receipt submitted successfully! Enrollment is pending administrator approval.');
+        showAlert('Receipt Submitted', 'Payment receipt submitted successfully! Enrollment is pending administrator approval.', 'info');
         setShowUploadModal(false);
         setReceiptFile(null);
         if (res.data?.payment) {
           setPaymentRecord(res.data.payment);
         }
       } else {
-        alert(res.error || 'Failed to submit payment receipt.');
+        showAlert('Submission Failed', res.error || 'Failed to submit payment receipt.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'Error uploading receipt.');
+      showAlert('Upload Error', err.message || 'Error uploading receipt.', 'danger');
     } finally {
       setSubmittingReceipt(false);
     }
@@ -266,210 +311,13 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
     firstLessonLink = `/learn/${course.id}/${modules[0].lessons[0].id}`;
   }
 
-  // Dynamic values helper based on course title
-  const getCourseSpecs = (title: string) => {
-    const t = title.toLowerCase();
-    if (t.includes('odoo')) {
-      return {
-        price: '400000K',
-        logo: <span className="text-[#5c3c92] font-black text-3xl tracking-tighter select-none font-sans">odoo</span>,
-        lectures: 18,
-        level: 'Beginner',
-        instructor: 'Yan Myo Aung',
-        bio: 'Yan Myo Aung is a senior ERP architect specializing in Odoo development and PostgreSQL integration with over 8 years of enterprise training experience.',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Understand Odoo framework architecture and database models',
-          'Create custom modules, views, actions, and menus',
-          'Extend existing Odoo applications with inheritance',
-          'Write secure APIs and controllers for Odoo integrations'
-        ]
-      };
-    }
-    if (t.includes('a+')) {
-      return {
-        price: '100000K',
-        logo: (
-          <div className="flex flex-col items-center justify-center border-2 border-red-500 rounded px-3 py-1 font-sans">
-            <span className="text-red-600 font-extrabold text-2xl tracking-tight leading-none">A+</span>
-            <span className="text-red-500 font-bold text-[6px] tracking-widest uppercase border-t border-red-500/30 pt-0.5 mt-0.5 leading-none">Certified IT Technician</span>
-          </div>
-        ),
-        lectures: 25,
-        level: 'Beginner',
-        instructor: 'Yan Myo Aung',
-        bio: 'Yan Myo Aung is a certified system administrator and hardware engineer with a passion for troubleshooting, operating systems, and teaching IT concepts.',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Understand core computer components (CPU, RAM, storage, motherboard, etc.)',
-          'Master system configurations and hardware diagnostic tools',
-          'Understand network setup, IP addressing, and troubleshooting',
-          'Configure secure system architectures and firewalls'
-        ]
-      };
-    }
-    if (t.includes('linux')) {
-      return {
-        price: '100000K',
-        logo: (
-          <div className="flex flex-col items-center gap-1 font-sans">
-            <svg viewBox="0 0 100 100" className="w-10 h-10 fill-current text-slate-800">
-              <path d="M50,10 C40,10 32,18 32,30 C32,36 34,42 38,46 C35,49 30,55 30,64 C30,76 38,84 50,84 C62,84 70,76 70,64 C70,55 65,49 62,46 C66,42 68,36 68,30 C68,18 60,10 50,10 Z" />
-              <circle cx="43" cy="28" r="3" className="text-white fill-current" />
-              <circle cx="57" cy="28" r="3" className="text-white fill-current" />
-              <path d="M47,36 Q50,42 53,36 Z" className="text-amber-500 fill-current" />
-            </svg>
-            <span className="font-extrabold text-[10px] tracking-widest uppercase text-slate-800 mt-1">Linux</span>
-          </div>
-        ),
-        lectures: 20,
-        level: 'Beginner',
-        instructor: 'Yan Myo Aung',
-        bio: 'Yan Myo Aung is a certified Linux Systems Engineer (LFCS) teaching bash scripting, server hardening, and administration routines.',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Master the Linux command line and system directory structure',
-          'Configure secure user permissions, groups, and SSH keys',
-          'Monitor system resource usage and manage systemd services',
-          'Automate routine operations using custom shell scripts'
-        ]
-      };
-    }
-    if (t.includes('computer science')) {
-      return {
-        price: '500000K',
-        logo: (
-          <div className="flex flex-col items-center font-sans">
-            <div className="relative flex items-center justify-center py-2 px-4">
-              <div className="absolute w-16 h-8 border-[3px] border-blue-600 rounded-full rotate-[-15deg] opacity-80" />
-              <span className="text-blue-700 font-black text-xl italic tracking-tighter relative z-10">NCC</span>
-            </div>
-            <span className="text-slate-500 text-[7px] tracking-widest uppercase font-extrabold mt-1">education</span>
-          </div>
-        ),
-        lectures: 30,
-        level: 'Beginner',
-        instructor: 'Dr. Jane Smith',
-        bio: 'Dr. Jane Smith is a computer science professor with over 15 years of academic and software engineering experience, publishing research on deep learning architectures.',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Understand algorithmic complexity and space-time Big O tradeoffs',
-          'Implement standard data structures: lists, stacks, trees, and hash tables',
-          'Learn foundational programming paradigms and compilers',
-          'Explore relational databases, concurrency, and web protocols'
-        ]
-      };
-    }
-    if (t.includes('front-end') || t.includes('web')) {
-      return {
-        price: '80000K',
-        logo: (
-          <div className="relative flex items-center justify-center w-16 h-16 font-sans">
-            <svg viewBox="0 0 100 100" className="absolute w-full h-full text-amber-500 fill-current">
-              <polygon points="50,5 95,28 95,72 50,95 5,72 5,28" />
-            </svg>
-            <span className="relative z-10 text-white font-black text-2xl tracking-tighter font-mono">{`</>`}</span>
-          </div>
-        ),
-        lectures: 22,
-        level: 'Beginner',
-        instructor: 'Dr. Jane Smith',
-        bio: 'Dr. Jane Smith is a full-stack researcher specialized in modern user experience design, React components, and static rendering frameworks.',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Build responsive, high-fidelity layouts using HTML5, CSS3, and Flexbox',
-          'Write interactive, modern JavaScript using ES6+ standards',
-          'Fetch APIs asynchronously and manage local client state',
-          'Create accessible user experiences following web best practices'
-        ]
-      };
-    }
-    if (t.includes('c++')) {
-      return {
-        price: '80000K',
-        logo: (
-          <div className="h-16 w-16 rounded-full bg-blue-600 text-white font-black flex items-center justify-center text-xl shadow-md border-2 border-white font-sans">
-            C++
-          </div>
-        ),
-        lectures: 28,
-        level: 'Beginner',
-        instructor: 'Dr. Jane Smith',
-        bio: 'Dr. Jane Smith has taught systems programming for a decade, specializing in native applications, memory management, and pointers optimization.',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Learn C++ variables, functions, loops, and control flow structures',
-          'Build object-oriented software with classes and polymorphism',
-          'Understand pointers, memory allocation, and garbage collection concepts',
-          'Use the Standard Template Library (STL) to organize data structures'
-        ]
-      };
-    }
-    if (t.includes('git') || t.includes('github')) {
-      return {
-        price: '100000K',
-        logo: (
-          <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xl font-sans">
-            <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
-              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.137 20.162 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
-            </svg>
-            <span className="text-xl font-bold tracking-tight text-slate-800">GitHub</span>
-          </div>
-        ),
-        lectures: 15,
-        level: 'Beginner',
-        instructor: 'Dr. Jane Smith',
-        bio: 'Dr. Jane Smith teaches collaborative coding tools, branching strategy pipelines, and source integrity best practices.',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Perform standard branch operations, merges, and resolve conflicts',
-          'Collaborate using remote repositories, forks, and pull requests',
-          'Automate code quality testing using GitHub Actions CI/CD',
-          'Learn best practices for commit history and version tags'
-        ]
-      };
-    }
-    if (t.includes('network') || t.includes('ne')) {
-      return {
-        price: '120000K',
-        logo: (
-          <div className="flex flex-col items-center justify-center font-sans">
-            <span className="text-red-600 font-black text-3xl tracking-tight leading-none">NE</span>
-            <span className="text-[6px] block text-slate-500 tracking-widest font-semibold uppercase mt-0.5">Network Engineering</span>
-          </div>
-        ),
-        lectures: 24,
-        level: 'Beginner',
-        instructor: 'Yan Myo Aung',
-        bio: 'Yan Myo Aung is a Cisco certified network engineer teaching IP subnetting, OSI layers routing, and security protocols.',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80',
-        whatWillILearn: [
-          'Understand the OSI reference model layers and TCP/IP protocols',
-          'Perform subnetting calculations and design stable IP addresses',
-          'Configure VLANs, routing tables, and access control lists (ACLs)',
-          'Deploy secure firewalls and packet filter mechanisms'
-        ]
-      };
-    }
-
-    return {
-      price: '150000K',
-      logo: <span className="text-teal-600 font-black text-3xl tracking-tight">LMS</span>,
-      lectures: 12,
-      level: 'Beginner',
-      instructor: 'Dr. Jane Smith',
-      bio: 'Dr. Jane Smith is an experienced professor in computer science and system architecture.',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=120&h=120&q=80',
-      whatWillILearn: [
-        'Master key industry concepts and standards in this domain',
-        'Build fully-functional projects using modern tech tools',
-        'Develop real-world problem-solving skills under professional guidance',
-        'Prepare yourself for standard certifications and interviews'
-      ]
-    };
-  };
-
-  const specs = getCourseSpecs(course.title);
+  // Generic learning outcomes fallback list if none are supplied by the instructor
+  const defaultOutcomes = [
+    "Understand core concepts and advanced methods in this domain.",
+    "Apply industry best practices in real-world scenarios.",
+    "Build fully-functional projects to demonstrate practical mastery.",
+    "Gain certified credentials to advance your professional career."
+  ];
 
   const totalMinutes = modules.reduce(
     (acc, m) => acc + m.lessons.reduce((lAcc, l) => lAcc + (l.duration || 0), 0),
@@ -502,14 +350,20 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
               {/* Creator details and rating line */}
               <div className="flex flex-wrap items-center gap-y-4 gap-x-6 text-xs text-slate-500 border-b border-slate-200/60 pb-6">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full overflow-hidden bg-slate-200 relative flex-shrink-0">
-                    <img
-                      src={course.instructorAvatarUrl || specs.avatar}
-                      alt={course.instructorName || specs.instructor}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="h-6 w-6 rounded-full overflow-hidden bg-slate-200 relative flex-shrink-0 flex items-center justify-center">
+                    {course.instructorAvatarUrl ? (
+                      <img
+                        src={course.instructorAvatarUrl}
+                        alt={course.instructorName || 'Instructor'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <svg className="w-full h-full bg-slate-300 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
+                        <path fillRule="evenodd" d="M12 2a5 5 0 100 10 5 5 0 000-10zM5 20a7 7 0 0114 0H5z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  <span className="font-semibold text-slate-700">Created by <strong className="text-slate-900 font-bold">{course.instructorName || specs.instructor}</strong></span>
+                  <span className="font-semibold text-slate-700">Created by <strong className="text-slate-900 font-bold">{course.instructorName || 'Unknown Instructor'}</strong></span>
                 </div>
 
                 <div className="flex items-center gap-1 text-amber-500 font-bold">
@@ -538,7 +392,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
 
                 <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
                   <span>📅</span>
-                  <span>Last updated Sun, 10-May-2026</span>
+                  <span>
+                    Last updated {formatDateString(course.updatedAt || course.createdAt, {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric'
+                    })}
+                  </span>
                 </div>
               </div>
             </div>
@@ -608,7 +469,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                 <div className="space-y-4 pt-6 border-t border-slate-100">
                   <h2 className="text-lg font-extrabold text-[#0f112e]">What will i learn?</h2>
                   <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
-                    {specs.whatWillILearn.map((point, i) => (
+                    {(course.outcomes
+                      ? course.outcomes
+                          .split('\n')
+                          .map((line) => line.trim())
+                          .filter((line) => line.length > 0)
+                          .map((line) => line.replace(/^[\s\-*•✦]+/, '').trim())
+                          .filter((line) => line.length > 0)
+                      : defaultOutcomes
+                    ).map((point, i) => (
                       <li key={i} className="flex gap-2.5 items-start">
                         <span className="text-[#0d9488] text-sm leading-none mt-0.5">✦</span>
                         <span className="leading-relaxed">{point}</span>
@@ -616,6 +485,26 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                     ))}
                   </ul>
                 </div>
+
+                {/* Requirements */}
+                {course.requirements && (
+                  <div className="space-y-4 pt-6 border-t border-slate-100">
+                    <h2 className="text-lg font-extrabold text-[#0f112e]">Requirements</h2>
+                    <ul className="list-disc pl-5 text-xs font-semibold text-slate-600 space-y-2">
+                      {course.requirements
+                        .split('\n')
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0)
+                        .map((line) => line.replace(/^[\s\-*•✦]+/, '').trim())
+                        .filter((line) => line.length > 0)
+                        .map((req, i) => (
+                          <li key={i} className="leading-relaxed">
+                            {req}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
 
                 {/* FAQ Section */}
                 {course.faq && (
@@ -741,18 +630,24 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
               <div className="bg-white border border-slate-200/60 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6 text-left">
                 <h2 className="text-lg font-extrabold text-[#0f112e]">Course Instructor</h2>
                 <div className="flex flex-col sm:flex-row gap-6 items-start">
-                  <div className="h-20 w-20 rounded-full overflow-hidden bg-slate-200 relative flex-shrink-0 border-2 border-white shadow-md mx-auto sm:mx-0">
-                    <img
-                      src={course.instructorAvatarUrl || specs.avatar}
-                      alt={course.instructorName || specs.instructor}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="h-20 w-20 rounded-full overflow-hidden bg-slate-200 relative flex-shrink-0 border-2 border-white shadow-md mx-auto sm:mx-0 flex items-center justify-center">
+                    {course.instructorAvatarUrl ? (
+                      <img
+                        src={course.instructorAvatarUrl}
+                        alt={course.instructorName || 'Instructor'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <svg className="w-full h-full bg-slate-300 text-slate-400" viewBox="0 0 24 24" fill="currentColor">
+                        <path fillRule="evenodd" d="M12 2a5 5 0 100 10 5 5 0 000-10zM5 20a7 7 0 0114 0H5z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
                   <div className="space-y-3 flex-1 text-center sm:text-left">
-                    <h3 className="font-extrabold text-base text-[#0f112e]">{course.instructorName || specs.instructor}</h3>
+                    <h3 className="font-extrabold text-base text-[#0f112e]">{course.instructorName || 'Unknown Instructor'}</h3>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Expert LMS Instructor</p>
                     <p className="text-slate-500 text-xs leading-relaxed whitespace-pre-line">
-                      {course.instructorBio || specs.bio}
+                      {course.instructorBio || 'No biography details provided by the instructor yet.'}
                     </p>
                   </div>
                 </div>
@@ -867,9 +762,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                     className="w-full h-full object-cover transform group-hover:scale-105 transition duration-300"
                   />
                 ) : (
-                  /* Center logo */
-                  <div className="transform group-hover:scale-105 transition duration-300">
-                    {specs.logo}
+                  /* Center logo (gradient placeholder with course initials) */
+                  <div className="h-full flex items-center justify-center bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-black text-3xl select-none w-full aspect-video">
+                    {course.title ? course.title.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'LMS'}
                   </div>
                 )}
 
@@ -887,7 +782,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
               <div className="px-6 space-y-6">
                 <div className="flex items-center justify-between">
                   <span className="text-2xl font-black text-slate-900 leading-none">
-                    {specs.price}
+                    {course.price > 0 ? `${course.price.toLocaleString()} MMK` : 'Free'}
                   </span>
                   {/* Mock action icon */}
                   <div className="h-8 w-8 rounded-lg bg-slate-50 border border-slate-200/60 flex items-center justify-center text-xs text-slate-500 cursor-pointer hover:bg-slate-100 transition">
@@ -904,7 +799,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                       </svg>
                       <span>Lectures</span>
                     </div>
-                    <span className="text-slate-900">{specs.lectures}</span>
+                    <span className="text-slate-900">{totalLessons}</span>
                   </div>
 
                   <div className="py-3.5 flex justify-between items-center">
@@ -914,7 +809,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                       </svg>
                       <span>Skill level</span>
                     </div>
-                    <span className="text-slate-900">{specs.level}</span>
+                    <span className="text-slate-900">{course.level || 'Beginner'}</span>
                   </div>
 
                   <div className="py-3.5 flex justify-between items-center">
@@ -1051,7 +946,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
                 <input 
                   type="text" 
                   disabled 
-                  value={course.price > 0 ? `${course.price.toLocaleString()} MMK` : `${specs.price}`}
+                  value={course.price > 0 ? `${course.price.toLocaleString()} MMK` : 'Free'}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-not-allowed"
                 />
               </div>
@@ -1093,6 +988,18 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        type={confirmConfig.type}
+        confirmOnly={confirmConfig.confirmOnly}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

@@ -116,8 +116,20 @@ export async function GET(request: NextRequest) {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short' });
+      
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Yangon',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const parts = formatter.formatToParts(d);
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+      const dateStr = `${year}-${month}-${day}`;
+      
+      const dayLabel = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Yangon' });
       last7Days.push(dateStr);
       
       let dayCount = 0;
@@ -145,7 +157,12 @@ export async function GET(request: NextRequest) {
     if (isLogsTableAvailable && activityLogs.length > 0) {
       activityLogs.forEach(log => {
         const logDate = new Date(log.createdAt);
-        const hour = logDate.getHours();
+        const hourStr = logDate.toLocaleTimeString('en-US', {
+          timeZone: 'Asia/Yangon',
+          hour: '2-digit',
+          hour12: false
+        });
+        const hour = parseInt(hourStr, 10) % 24;
         hourlyCounts[hour]++;
       });
     }

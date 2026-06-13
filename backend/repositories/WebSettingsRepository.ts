@@ -39,12 +39,12 @@ export class WebSettingsRepository {
       // Return default values in case database is not migrated yet
       return {
         id: 'current',
-        lmsName: 'Aegis Academy',
-        bannerTitle: 'Unlock Your Potential with Aegis Academy',
+        lmsName: 'Nexora Academy',
+        bannerTitle: 'Unlock Your Potential with Nexora Academy',
         bannerSubtitle: 'Access world-class learning and professional certifications, anytime, anywhere.',
         bannerUrl: null,
-        footerInfo: '© 2026 Aegis Academy. All rights reserved.',
-        contactEmail: 'support@aegisacademy.com',
+        footerInfo: '© 2026 Nexora Academy. All rights reserved.',
+        contactEmail: 'support@nexoraacademy.com',
         updatedAt: new Date().toISOString(),
       };
     }

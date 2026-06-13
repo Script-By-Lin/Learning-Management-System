@@ -35,7 +35,7 @@ export default function Navbar() {
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center">
               <span className="font-extrabold text-lg tracking-tight text-[#0f112e] whitespace-nowrap">
-                {settings?.lmsName || 'Aegis Academy'}
+                {settings?.lmsName || 'Nexora Academy'}
               </span>
             </Link>
 

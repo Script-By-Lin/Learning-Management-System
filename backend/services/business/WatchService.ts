@@ -275,6 +275,66 @@ export class WatchService {
       }
     }
 
+    // Pre-calculate course lessons structure to avoid database queries in a loop
+    const { data: allModules } = await supabase
+      .from('Module')
+      .select('id, courseId')
+      .in('courseId', courseIds);
+
+    const moduleIds = allModules ? allModules.map((m) => m.id) : [];
+    let lessonsByCourse: Record<string, string[]> = {}; // courseId -> lessonIds[]
+    if (moduleIds.length > 0) {
+      const { data: allLessons } = await supabase
+        .from('Lesson')
+        .select('id, moduleId')
+        .in('moduleId', moduleIds);
+      
+      if (allLessons && allModules) {
+        allLessons.forEach((l) => {
+          const mod = allModules.find((m) => m.id === l.moduleId);
+          if (mod) {
+            if (!lessonsByCourse[mod.courseId]) {
+              lessonsByCourse[mod.courseId] = [];
+            }
+            lessonsByCourse[mod.courseId].push(l.id);
+          }
+        });
+      }
+    }
+
+    // Query LessonProgress for these students and lessons
+    const allLessonIds = Object.values(lessonsByCourse).flat();
+    let completedLessonsMap: Record<string, Set<string>> = {}; // "userId-courseId" -> Set of completed lessonIds
+    if (allLessonIds.length > 0 && studentIds.length > 0) {
+      const { data: progress } = await supabase
+        .from('LessonProgress')
+        .select('userId, lessonId')
+        .eq('completed', true)
+        .in('userId', studentIds)
+        .in('lessonId', allLessonIds);
+      
+      if (progress) {
+        // Map lessonId to courseId
+        const lessonToCourse: Record<string, string> = {};
+        Object.entries(lessonsByCourse).forEach(([courseId, lessonIds]) => {
+          lessonIds.forEach((lId) => {
+            lessonToCourse[lId] = courseId;
+          });
+        });
+
+        progress.forEach((p) => {
+          const courseId = lessonToCourse[p.lessonId];
+          if (courseId) {
+            const key = `${p.userId}-${courseId}`;
+            if (!completedLessonsMap[key]) {
+              completedLessonsMap[key] = new Set();
+            }
+            completedLessonsMap[key].add(p.lessonId);
+          }
+        });
+      }
+    }
+
     // Build studentWatchDetails
     const studentWatchDetails: StudentWatchDetail[] = [];
     if (enrollments) {
@@ -286,12 +346,13 @@ export class WatchService {
           const watchedSeconds = studentSessions.reduce((sum, s) => sum + s.watchedSeconds, 0);
           const watchedMinutes = Math.round(watchedSeconds / 60);
 
+          // Calculate actual completion progress
+          const courseLessonIds = lessonsByCourse[e.courseId] || [];
+          const totalLessonsCount = courseLessonIds.length;
           let completionPercent = 0;
-          if (studentSessions.length > 0) {
-            const completionSum = studentSessions.reduce((sum, s) => {
-              return sum + (s.totalSeconds > 0 ? (s.watchedSeconds / s.totalSeconds) * 100 : 0);
-            }, 0);
-            completionPercent = Math.min(Math.round(completionSum / studentSessions.length), 100);
+          if (totalLessonsCount > 0) {
+            const completedCount = completedLessonsMap[`${e.userId}-${e.courseId}`]?.size || 0;
+            completionPercent = Math.min(100, Math.max(0, Math.round((completedCount / totalLessonsCount) * 100)));
           }
 
           studentWatchDetails.push({
@@ -313,14 +374,20 @@ export class WatchService {
       const courseSessions = allSessions.filter((s) => s.courseId === course.id);
       const courseWatchSeconds = courseSessions.reduce((sum, s) => sum + s.watchedSeconds, 0);
 
-      // Calculate average completion
-      const uniqueStudents = new Set(courseSessions.map((s) => s.userId));
+      // Calculate average completion from actual student progress
       let avgCompletion = 0;
-      if (uniqueStudents.size > 0) {
-        const completionSum = courseSessions.reduce((sum, s) => {
-          return sum + (s.totalSeconds > 0 ? (s.watchedSeconds / s.totalSeconds) * 100 : 0);
-        }, 0);
-        avgCompletion = Math.round(completionSum / courseSessions.length);
+      if (courseEnrollments.length > 0) {
+        const courseLessonIds = lessonsByCourse[course.id] || [];
+        const totalLessonsCount = courseLessonIds.length;
+        if (totalLessonsCount > 0) {
+          let totalCompletionSum = 0;
+          courseEnrollments.forEach((e) => {
+            const completedCount = completedLessonsMap[`${e.userId}-${course.id}`]?.size || 0;
+            const studentPercent = Math.min(100, Math.max(0, Math.round((completedCount / totalLessonsCount) * 100)));
+            totalCompletionSum += studentPercent;
+          });
+          avgCompletion = Math.round(totalCompletionSum / courseEnrollments.length);
+        }
       }
 
       return {

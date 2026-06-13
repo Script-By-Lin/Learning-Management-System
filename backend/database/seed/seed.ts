@@ -13,7 +13,7 @@ async function main() {
   const now = new Date().toISOString();
 
   // Helper function to check and create user
-  const upsertUser = async (email: string, fullName: string, passwordHash: string, role: Role) => {
+  const upsertUser = async (email: string, fullName: string, passwordHash: string, role: Role, isApproved?: boolean) => {
     const { data: existingUser, error: findError } = await supabase
       .from('User')
       .select('*')
@@ -38,6 +38,7 @@ async function main() {
         fullName,
         passwordHash,
         role,
+        isApproved: isApproved ?? (role === Role.INSTRUCTOR ? true : undefined),
         createdAt: now,
         updatedAt: now,
       })
@@ -53,16 +54,16 @@ async function main() {
   };
 
   // 1. Create Admin
-  const admin = await upsertUser('admin@aegisacademy.com', 'System Administrator', adminPasswordHash, Role.ADMIN);
+  const admin = await upsertUser('admin@nexoraacademy.com', 'System Administrator', adminPasswordHash, Role.ADMIN);
   const lmsAdmin = await upsertUser('admin@lms.com', 'LMS Admin', adminPasswordHash, Role.ADMIN);
 
   // 2. Create Instructors
-  const instructor1 = await upsertUser('instructor@aegisacademy.com', 'Dr. Jane Smith', instructorPasswordHash, Role.INSTRUCTOR);
-  const instructor2 = await upsertUser('yanmyoaung@aegisacademy.com', 'Yan Myo Aung', instructorPasswordHash, Role.INSTRUCTOR);
-  const lmsInstructor = await upsertUser('instructor@lms.com', 'LMS Instructor', instructorPasswordHash, Role.INSTRUCTOR);
+  const instructor1 = await upsertUser('instructor@nexoraacademy.com', 'Dr. Jane Smith', instructorPasswordHash, Role.INSTRUCTOR, true);
+  const instructor2 = await upsertUser('yanmyoaung@nexoraacademy.com', 'Yan Myo Aung', instructorPasswordHash, Role.INSTRUCTOR, true);
+  const lmsInstructor = await upsertUser('instructor@lms.com', 'LMS Instructor', instructorPasswordHash, Role.INSTRUCTOR, true);
 
   // 3. Create Students
-  const student = await upsertUser('student@aegisacademy.com', 'Alex Vance', studentPasswordHash, Role.STUDENT);
+  const student = await upsertUser('student@nexoraacademy.com', 'Alex Vance', studentPasswordHash, Role.STUDENT);
   const lmsStudent = await upsertUser('student@lms.com', 'LMS Student', studentPasswordHash, Role.STUDENT);
   const lmsUser = await upsertUser('user@lms.com', 'LMS User', studentPasswordHash, Role.STUDENT);
 

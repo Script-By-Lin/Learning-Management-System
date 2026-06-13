@@ -36,7 +36,7 @@ export class EmailService {
 
     const payload = {
       personalizations: [{ to: [{ email: to }] }],
-      from: { email: 'noreply@aegisacademy.com', name: 'Aegis Academy' },
+      from: { email: 'noreply@nexoraacademy.com', name: 'Nexora Academy' },
       subject: subject,
       content: [{ type: 'text/html', value: htmlContent }],
     };

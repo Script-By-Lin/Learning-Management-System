@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="relative z-10">
           <Link href="/" className="inline-flex items-center mb-10">
             <span className="text-xl font-bold text-white tracking-wide">
-              {settings?.lmsName || 'Aegis Academy'}
+              {settings?.lmsName || 'Nexora Academy'}
             </span>
           </Link>
 
@@ -79,7 +79,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-white/40 text-[10px] font-medium relative z-10">
-          {settings?.footerInfo || '© 2026 Aegis Academy. All rights reserved.'}
+          {settings?.footerInfo || '© 2026 Nexora Academy. All rights reserved.'}
         </div>
       </div>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
         <div className="lg:hidden mb-8 text-center">
           <Link href="/" className="inline-flex items-center">
             <span className="text-lg font-bold text-slate-800 tracking-wide">
-              {settings?.lmsName || 'Aegis Academy'}
+              {settings?.lmsName || 'Nexora Academy'}
             </span>
           </Link>
         </div>

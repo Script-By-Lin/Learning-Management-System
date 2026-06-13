@@ -1,5 +1,5 @@
 const DEFAULT_LOCALE = 'en-US';
-const DEFAULT_TIMEZONE = 'UTC';
+const DEFAULT_TIMEZONE = 'Asia/Yangon';
 
 function formatDateValue(value: string | Date, options?: Intl.DateTimeFormatOptions, locale = DEFAULT_LOCALE) {
   if (!value) return '';

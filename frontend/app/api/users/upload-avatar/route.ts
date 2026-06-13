@@ -30,7 +30,21 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const fileExtension = path.extname(file.name) || '.jpg';
+    let fileExtension = path.extname(file.name || '');
+    if (!fileExtension && file.type) {
+      const mimeToExt: Record<string, string> = {
+        'image/jpeg': '.jpg',
+        'image/jpg': '.jpg',
+        'image/png': '.png',
+        'image/gif': '.gif',
+        'image/webp': '.webp',
+      };
+      fileExtension = mimeToExt[file.type] || '';
+    }
+    if (!fileExtension) {
+      fileExtension = '.jpg';
+    }
+
     const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
     if (!allowedExtensions.includes(fileExtension.toLowerCase())) {
       return NextResponse.json(
@@ -39,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const filename = `avatar_${userPayload.userId}_${Date.now()}${fileExtension}`;
+    const filename = `avatar_${userPayload.userId}_${Date.now()}${fileExtension.toLowerCase()}`;
     
     // Dynamically resolve upload path depending on whether server is running from root or frontend folder
     let uploadDir = '';

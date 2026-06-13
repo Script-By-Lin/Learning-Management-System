@@ -335,9 +335,9 @@ export default function Home() {
         {/* Right Column (Hero Graphic illustration) */}
         <div className="flex-1 w-full max-w-md md:max-w-none flex justify-center items-center">
           <div className="relative w-full aspect-square max-w-[420px] flex items-center justify-center">
-            {/* Background Graphic Rings */}
-            <div className="absolute inset-0 bg-yellow-400 rounded-full w-[85%] h-[85%] left-0 top-[15%] opacity-90 -z-10 shadow-lg" />
-            <div className="absolute inset-0 bg-[#0d9488] rounded-full w-[85%] h-[85%] right-0 bottom-[15%] opacity-90 -z-10 shadow-lg" />
+            {/* Soft Glowing Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-teal-500/10 to-indigo-500/10 blur-3xl rounded-full w-[85%] h-[85%] left-0 top-[15%] -z-10" />
+            <div className="absolute inset-0 bg-gradient-to-bl from-teal-500/10 to-indigo-500/10 blur-3xl rounded-full w-[85%] h-[85%] right-0 bottom-[15%] -z-10" />
 
             {/* Generated Student Image */}
             <div className="relative w-full h-full flex items-end justify-center">
@@ -553,7 +553,7 @@ export default function Home() {
       {/* 5. Footer */}
       <footer className="border-t border-slate-100 bg-[#0f112e] text-slate-400 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-          <p>{settings?.footerInfo || `© ${new Date().getFullYear()} Aegis Academy. All rights reserved.`}</p>
+          <p>{settings?.footerInfo || `© ${new Date().getFullYear()} Nexora Academy. All rights reserved.`}</p>
           <div className="flex gap-6">
             <span className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span>
             <span className="hover:text-white transition-colors cursor-pointer">Terms of Service</span>

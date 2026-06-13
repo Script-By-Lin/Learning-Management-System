@@ -10,7 +10,8 @@
     "build": "npm run build --workspace=frontend",
     "start": "npm run start --workspace=frontend",
     "lint": "npm run lint --workspace=frontend",
-    "db:seed": "npx tsx backend/database/seed/seed.ts"
+    "db:seed": "npx tsx backend/database/seed/seed.ts",
+    "db:clear": "npx tsx backend/database/seed/clear.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

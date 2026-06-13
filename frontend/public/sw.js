@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aegis-lms-cache-v1';
+const CACHE_NAME = 'nexora-lms-cache-v1';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',

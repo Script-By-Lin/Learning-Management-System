@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { MessagesPanel } from './MessagesPanel';
 import { useAuth } from '@/hooks/useAuth';
 import authService from '@/services/authService';
+import ConfirmModal from './ConfirmModal';
 
 interface InstructorDashboardProps {
   user: UserProfile;
@@ -33,6 +34,47 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
   const { logout, refreshProfile, settings } = useAuth();
   const [activeTab, setActiveTab] = useState<InstructorTab>('dashboard');
   const [showMobileMoreMenu, setShowMobileMoreMenu] = useState(false);
+
+  // Custom Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmOnly?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmOnly: false,
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (config: Omit<typeof confirmConfig, 'isOpen'>) => {
+    setConfirmConfig({
+      ...config,
+      isOpen: true
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const showAlert = (title: string, message: string, type: 'info' | 'warning' | 'danger' = 'info') => {
+    setConfirmConfig({
+      title,
+      message,
+      type,
+      confirmLabel: 'OK',
+      confirmOnly: true,
+      isOpen: true,
+      onConfirm: () => closeConfirm(),
+    });
+  };
   const [activeDetailItem, setActiveDetailItem] = useState<{
     type: 'perCourse' | 'studentProgress';
     data: any;
@@ -61,6 +103,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
   const [courseRequirements, setCourseRequirements] = useState('');
   const [courseOutcomes, setCourseOutcomes] = useState('');
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [coursePrice, setCoursePrice] = useState<number | string>(0);
 
   // Instructor analytics
   const [instructorAnalytics, setInstructorAnalytics] = useState<any>(null);
@@ -83,7 +126,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullNameInput.trim()) {
-      alert('Full name is required.');
+      showAlert('Validation Error', 'Full name is required.', 'warning');
       return;
     }
     try {
@@ -96,7 +139,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
           finalAvatarUrl = uploadRes.data.avatarUrl;
           setAvatarUrlInput(finalAvatarUrl);
         } else {
-          alert(uploadRes.error || 'Failed to upload profile picture.');
+          showAlert('Upload Failed', uploadRes.error || 'Failed to upload profile picture.', 'danger');
           return;
         }
       }
@@ -108,16 +151,16 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
       });
 
       if (res.success) {
-        alert('Profile updated successfully!');
+        showAlert('Success', 'Profile updated successfully!', 'info');
         setAvatarFile(null);
         if (refreshProfile) {
           await refreshProfile();
         }
       } else {
-        alert(res.error || 'Failed to update profile.');
+        showAlert('Error', res.error || 'Failed to update profile.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setSavingProfile(false);
     }
@@ -199,7 +242,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!courseTitle || !courseCategory || !courseDescription) {
-      alert('Please fill out all fields.');
+      showAlert('Validation Error', 'Please fill out all fields.', 'warning');
       return;
     }
     try {
@@ -211,7 +254,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
         if (uploadRes.success && uploadRes.data?.thumbnailUrl) {
           uploadedThumbnailUrl = uploadRes.data.thumbnailUrl;
         } else {
-          alert(uploadRes.error || 'Failed to upload course thumbnail.');
+          showAlert('Upload Failed', uploadRes.error || 'Failed to upload course thumbnail.', 'danger');
           return;
         }
       }
@@ -229,6 +272,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
           : null,
         requirements: courseRequirements || null,
         outcomes: courseOutcomes || null,
+        price: Number(coursePrice),
       });
       if (res.success) {
         setCourseTitle('');
@@ -237,38 +281,48 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
         setCourseRequirements('');
         setCourseOutcomes('');
         setThumbnailFile(null);
+        setCoursePrice(0);
         setShowCreateModal(false);
         loadCourses();
         loadInstructorAnalytics();
+        showAlert('Success', 'Course program created successfully!', 'info');
       } else {
-        alert(res.error || 'Failed to create course.');
+        showAlert('Error', res.error || 'Failed to create course.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setCreating(false);
     }
   };
 
   const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course and all its modules/lessons? This action cannot be undone.')) return;
-    try {
-      const res = await courseService.deleteCourse(courseId);
-      if (res.success) {
-        loadCourses();
-        loadInstructorAnalytics();
-      } else {
-        alert(res.error || 'Failed to delete course.');
+    showConfirm({
+      title: 'Delete Course',
+      message: 'Are you sure you want to delete this course and all its modules/lessons? This action cannot be undone.',
+      type: 'danger',
+      confirmLabel: 'Delete Course',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await courseService.deleteCourse(courseId);
+          if (res.success) {
+            loadCourses();
+            loadInstructorAnalytics();
+          } else {
+            showAlert('Error', res.error || 'Failed to delete course.', 'danger');
+          }
+        } catch (err: any) {
+          showAlert('Error', err.message || 'An error occurred.', 'danger');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    }
+    });
   };
 
   const handlePostAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCourseForAnnouncement || !announcementTitle || !announcementContent) {
-      alert('Please fill out all fields.');
+      showAlert('Validation Error', 'Please fill out all fields.', 'warning');
       return;
     }
     try {
@@ -280,12 +334,12 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
       if (res.success) {
         setAnnouncementTitle('');
         setAnnouncementContent('');
-        alert('Announcement published successfully!');
+        showAlert('Success', 'Announcement published successfully!', 'info');
       } else {
-        alert(res.error || 'Failed to publish announcement.');
+        showAlert('Error', res.error || 'Failed to publish announcement.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setPostingAnnouncement(false);
     }
@@ -458,7 +512,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
             <button
               onClick={() => {
                 if (!user.isApproved) {
-                  alert('Your instructor account is pending admin approval. You cannot create courses.');
+                  showAlert('Approval Pending', 'Your instructor account is pending admin approval. You cannot create courses.', 'warning');
                   return;
                 }
                 setShowCreateModal(true);
@@ -501,7 +555,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
             <button
               onClick={() => {
                 if (!user.isApproved) {
-                  alert('Your instructor account is pending admin approval. You cannot create courses.');
+                  showAlert('Approval Pending', 'Your instructor account is pending admin approval. You cannot create courses.', 'warning');
                   return;
                 }
                 setShowCreateModal(true);
@@ -959,7 +1013,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
           <div className="px-5 py-5 border-b border-slate-100">
             <div className="flex items-center">
               <span className="font-bold tracking-wide text-slate-800 text-sm">
-                {settings?.lmsName || 'Aegis Academy'}
+                {settings?.lmsName || 'Nexora Academy'}
               </span>
             </div>
           </div>
@@ -1047,7 +1101,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
                 <div>
                   <p className="text-xs font-bold text-amber-800">Account Approval Pending</p>
                   <p className="text-[10px] text-amber-600 mt-0.5">
-                    Your instructor profile is pending approval by Aegis Academy administrators. You cannot publish or create new courses until your account is approved.
+                    Your instructor profile is pending approval by Nexora Academy administrators. You cannot publish or create new courses until your account is approved.
                   </p>
                 </div>
               </div>
@@ -1175,7 +1229,7 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Level</label>
                   <select
@@ -1200,6 +1254,19 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
                     <option value="PRIVATE">Private</option>
                     <option value="UPCOMING">Upcoming</option>
                   </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Price (MMK)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={coursePrice}
+                    onChange={(e) => setCoursePrice(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs outline-none focus:border-teal-500 text-slate-700"
+                    required
+                  />
                 </div>
               </div>
 
@@ -1429,6 +1496,18 @@ export function InstructorDashboard({ user }: InstructorDashboardProps) {
           </div>
         </div>
       )}
+      {/* Reusable Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        type={confirmConfig.type}
+        confirmOnly={confirmConfig.confirmOnly}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

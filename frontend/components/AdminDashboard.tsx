@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { MessagesPanel } from './MessagesPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDateString } from '@/utils/date';
+import ConfirmModal from './ConfirmModal';
 
 interface AdminDashboardProps {
   user: UserProfile;
@@ -60,6 +61,52 @@ interface EnrollmentItem {
 export function AdminDashboard({ user }: AdminDashboardProps) {
   const router = useRouter();
   const { logout, settings, updateSettings, uploadBanner } = useAuth();
+  
+  // Custom Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmOnly?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmOnly: false,
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (config: Omit<typeof confirmConfig, 'isOpen'>) => {
+    setConfirmConfig({
+      ...config,
+      isOpen: true
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const showAlert = (title: string, message: string, type: 'info' | 'warning' | 'danger' = 'info') => {
+    setConfirmConfig({
+      title,
+      message,
+      type,
+      confirmLabel: 'OK',
+      confirmOnly: true,
+      isOpen: true,
+      onConfirm: () => closeConfirm(),
+    });
+  };
+
+  // Shadow window.alert to automatically use our custom modal
+  const alert = (message: string) => {
+    showAlert('System Notification', message, 'info');
+  };
   
   // Navigation Tabs state
   const [activeTab, setActiveTab] = useState<
@@ -450,17 +497,25 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
-    try {
-      const res = await courseService.deleteCategory(id);
-      if (res.success) {
-        fetchCategories();
-      } else {
-        alert(res.error || 'Failed to delete category.');
+    showConfirm({
+      title: 'Delete Category',
+      message: 'Are you sure you want to delete this category? This action cannot be undone.',
+      type: 'danger',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await courseService.deleteCategory(id);
+          if (res.success) {
+            fetchCategories();
+          } else {
+            alert(res.error || 'Failed to delete category.');
+          }
+        } catch (err: any) {
+          alert(err.message || 'An error occurred.');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    }
+    });
   };
 
   // Handle instructor approvals
@@ -483,27 +538,33 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
   };
 
   const handleDeleteUser = async (targetUserId: string) => {
-    if (!confirm('Are you sure you want to permanently delete this user account? This action cannot be undone.')) {
-      return;
-    }
-    try {
-      setUpdatingUserId(targetUserId);
-      const res = await fetch(`/api/users?id=${targetUserId}`, {
-        method: 'DELETE',
-      });
-      const result = await res.json();
-      if (result.success) {
-        setUsers((prev) => prev.filter((u) => u.id !== targetUserId));
-        fetchStats();
-        fetchReports();
-      } else {
-        alert(result.error || 'Failed to delete user.');
+    showConfirm({
+      title: 'Permanently Delete User',
+      message: 'Are you sure you want to permanently delete this user account? This action cannot be undone.',
+      type: 'danger',
+      confirmLabel: 'Delete Permanently',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          setUpdatingUserId(targetUserId);
+          const res = await fetch(`/api/users?id=${targetUserId}`, {
+            method: 'DELETE',
+          });
+          const result = await res.json();
+          if (result.success) {
+            setUsers((prev) => prev.filter((u) => u.id !== targetUserId));
+            fetchStats();
+            fetchReports();
+          } else {
+            alert(result.error || 'Failed to delete user.');
+          }
+        } catch (err: any) {
+          alert(err.message || 'An error occurred.');
+        } finally {
+          setUpdatingUserId(null);
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    } finally {
-      setUpdatingUserId(null);
-    }
+    });
   };
 
   // Handle admin registering new user
@@ -632,41 +693,53 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
 
   // Handle course deletion request
   const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course and all its modules/lessons? This action cannot be undone.')) {
-      return;
-    }
-    try {
-      const res = await courseService.deleteCourse(courseId);
-      if (res.success) {
-        fetchCourses();
-        fetchStats();
-      } else {
-        alert(res.error || 'Failed to delete course.');
+    showConfirm({
+      title: 'Delete Course',
+      message: 'Are you sure you want to delete this course and all its modules/lessons? This action cannot be undone.',
+      type: 'danger',
+      confirmLabel: 'Delete Course',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await courseService.deleteCourse(courseId);
+          if (res.success) {
+            fetchCourses();
+            fetchStats();
+          } else {
+            alert(res.error || 'Failed to delete course.');
+          }
+        } catch (err: any) {
+          alert(err.message || 'An error occurred.');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    }
+    });
   };
 
   // Handle Revoke Enrollment request
   const handleRevokeEnrollment = async (enrollId: string) => {
-    if (!confirm('Are you sure you want to revoke this enrollment? The student will lose classroom access.')) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/admin/enrollments?id=${enrollId}`, {
-        method: 'DELETE',
-      });
-      const result = await res.json();
-      if (result.success) {
-        setEnrollments((prev) => prev.filter((item) => item.id !== enrollId));
-        fetchStats();
-      } else {
-        alert(result.error || 'Failed to revoke enrollment.');
+    showConfirm({
+      title: 'Revoke Enrollment',
+      message: 'Are you sure you want to revoke this enrollment? The student will lose classroom access.',
+      type: 'danger',
+      confirmLabel: 'Revoke',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await fetch(`/api/admin/enrollments?id=${enrollId}`, {
+            method: 'DELETE',
+          });
+          const result = await res.json();
+          if (result.success) {
+            setEnrollments((prev) => prev.filter((item) => item.id !== enrollId));
+            fetchStats();
+          } else {
+            alert(result.error || 'Failed to revoke enrollment.');
+          }
+        } catch (err: any) {
+          alert(err.message || 'An error occurred.');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    }
+    });
   };
 
   // Handle Sign Out
@@ -752,21 +825,27 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
 
   // Action for offline payment approvals
   const handlePaymentStatus = async (payId: string, status: 'APPROVED' | 'REJECTED') => {
-    const confirmation = confirm(`Are you sure you want to ${status.toLowerCase()} this payment request?`);
-    if (!confirmation) return;
-
-    try {
-      const res = await courseService.reviewOfflinePayment(payId, status);
-      if (res.success) {
-        fetchPayments();
-        fetchStats();
-        fetchEnrollments();
-      } else {
-        alert(res.error || 'Failed to update payment status.');
+    showConfirm({
+      title: `${status === 'APPROVED' ? 'Approve' : 'Reject'} Payment Request`,
+      message: `Are you sure you want to ${status.toLowerCase()} this payment request?`,
+      type: status === 'APPROVED' ? 'info' : 'danger',
+      confirmLabel: status === 'APPROVED' ? 'Approve' : 'Reject',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await courseService.reviewOfflinePayment(payId, status);
+          if (res.success) {
+            fetchPayments();
+            fetchStats();
+            fetchEnrollments();
+          } else {
+            alert(res.error || 'Failed to update payment status.');
+          }
+        } catch (err: any) {
+          alert(err.message || 'An error occurred during verification.');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred during verification.');
-    }
+    });
   };
 
   // Filters
@@ -949,7 +1028,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
             <div>
               <h3 className="font-extrabold text-slate-800 text-sm">{user.fullName}</h3>
               <span className="text-[10px] uppercase font-bold text-teal-600 tracking-wider">
-                {settings?.lmsName || 'Aegis Academy'} Admin
+                {settings?.lmsName || 'Nexora Academy'} Admin
               </span>
             </div>
           </div>
@@ -1192,7 +1271,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
           </div>
 
           <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-            <span className="hidden sm:inline">{settings?.lmsName || 'Aegis Academy'} Core v1.0</span>
+            <span className="hidden sm:inline">{settings?.lmsName || 'Nexora Academy'} Core v1.0</span>
             <span className="hidden sm:inline h-4 w-px bg-slate-200" />
             <a href="/" className="text-teal-600 hover:underline">View Portal</a>
           </div>
@@ -2271,7 +2350,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Newsletter Subject</label>
                   <input
                     type="text"
-                    placeholder="e.g. Aegis Academy Holiday Notice & System Updates"
+                    placeholder="e.g. Nexora Academy Holiday Notice & System Updates"
                     value={newsletterSubject}
                     onChange={(e) => setNewsletterSubject(e.target.value)}
                     className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl p-2.5 text-xs outline-none focus:border-[#0d9488] text-slate-700"
@@ -2325,7 +2404,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
                         <div>
                           <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-bold text-[9px] uppercase tracking-wider">{t.id.slice(0, 8)}</span>
                           <h3 className="font-extrabold text-sm text-slate-800 mt-1.5">{t.subject}</h3>
-                          <p className="text-[10px] text-slate-400 mt-0.5">From: {t.name} ({t.email}) • {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : t.date}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">From: {t.name} ({t.email}) • {formatDateString(t.createdAt || t.date)}</p>
                         </div>
 
                         <button
@@ -2445,7 +2524,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
                             </span>
                           </td>
                           <td className="p-4 text-right text-slate-400">
-                            {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : post.date}
+                            {formatDateString(post.createdAt || post.date)}
                           </td>
                         </tr>
                       ))
@@ -3306,7 +3385,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
                     <div className="grid grid-cols-3 gap-1 pb-2">
                       <span className="font-bold text-slate-400">Publish Date</span>
                       <span className="col-span-2 text-slate-800">
-                        {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : post.date}
+                        {formatDateString(post.createdAt || post.date)}
                       </span>
                     </div>
                   </div>
@@ -3316,6 +3395,18 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
           </div>
         </div>
       )}
+      {/* Reusable Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        type={confirmConfig.type}
+        confirmOnly={confirmConfig.confirmOnly}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

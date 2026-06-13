@@ -23,13 +23,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Aegis Academy | Learning Management System",
+  title: "Nexora Academy | Learning Management System",
   description: "A secure, production-grade platform for interactive learning.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Aegis LMS"
+    title: "Nexora LMS"
   }
 };
 

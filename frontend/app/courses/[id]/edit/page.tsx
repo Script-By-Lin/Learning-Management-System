@@ -5,6 +5,7 @@ import Navbar from '@/components/Navbar';
 import courseService from '@/services/courseService';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
+import ConfirmModal from '@/components/ConfirmModal';
 import { useRouter } from 'next/navigation';
 import { formatDateString } from '@/utils/date';
 
@@ -81,6 +82,47 @@ interface Submission {
 export default function CourseEditPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+
+  // Custom Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmOnly?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmOnly: false,
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (config: Omit<typeof confirmConfig, 'isOpen'>) => {
+    setConfirmConfig({
+      ...config,
+      isOpen: true
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const showAlert = (title: string, message: string, type: 'info' | 'warning' | 'danger' = 'info') => {
+    setConfirmConfig({
+      title,
+      message,
+      type,
+      confirmLabel: 'OK',
+      confirmOnly: true,
+      isOpen: true,
+      onConfirm: () => closeConfirm(),
+    });
+  };
   const resolvedParams = React.use(params);
   const courseId = resolvedParams.id;
 
@@ -105,6 +147,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
   const [savingCourse, setSavingCourse] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [price, setPrice] = useState<number | string>(0);
 
   // States for adding modules
   const [showAddModuleModal, setShowAddModuleModal] = useState(false);
@@ -194,6 +237,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         setRequirements(res.data.course.requirements || '');
         setOutcomes(res.data.course.outcomes || '');
         setThumbnailUrl(res.data.course.thumbnailUrl || null);
+        setPrice(res.data.course.price !== undefined ? res.data.course.price : 0);
 
         // Auto expand all modules
         const initialExpanded: Record<string, boolean> = {};
@@ -275,7 +319,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
   const handleUpdateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description || !category) {
-      alert('Please fill out all course details fields.');
+      showAlert('Validation Error', 'Please fill out all course details fields.', 'warning');
       return;
     }
     try {
@@ -287,7 +331,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         if (uploadRes.success && uploadRes.data?.thumbnailUrl) {
           finalThumbnailUrl = uploadRes.data.thumbnailUrl;
         } else {
-          alert(uploadRes.error || 'Failed to upload course thumbnail.');
+          showAlert('Upload Failed', uploadRes.error || 'Failed to upload course thumbnail.', 'danger');
           return;
         }
       }
@@ -305,16 +349,17 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         requirements: requirements || null,
         outcomes: outcomes || null,
         thumbnailUrl: finalThumbnailUrl,
+        price: Number(price),
       });
       if (res.success) {
-        alert('Course details saved successfully!');
+        showAlert('Success', 'Course details saved successfully!', 'info');
         setThumbnailFile(null);
         loadSyllabus();
       } else {
-        alert(res.error || 'Failed to save course details.');
+        showAlert('Error', res.error || 'Failed to save course details.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setSavingCourse(false);
     }
@@ -335,29 +380,35 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         setShowAddModuleModal(false);
         loadSyllabus();
       } else {
-        alert(res.error || 'Failed to create module.');
+        showAlert('Error', res.error || 'Failed to create module.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setAddingModule(false);
     }
   };
 
   const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Are you sure you want to delete this module and all its lessons? This cannot be undone.')) {
-      return;
-    }
-    try {
-      const res = await courseService.deleteModule(moduleId);
-      if (res.success) {
-        loadSyllabus();
-      } else {
-        alert(res.error || 'Failed to delete module.');
+    showConfirm({
+      title: 'Delete Syllabus Module',
+      message: 'Are you sure you want to delete this module and all its lessons? This cannot be undone.',
+      type: 'danger',
+      confirmLabel: 'Delete Module',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await courseService.deleteModule(moduleId);
+          if (res.success) {
+            loadSyllabus();
+          } else {
+            showAlert('Error', res.error || 'Failed to delete module.', 'danger');
+          }
+        } catch (err: any) {
+          showAlert('Error', err.message || 'An error occurred.', 'danger');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    }
+    });
   };
 
   const handleCreateLesson = async (e: React.FormEvent) => {
@@ -382,29 +433,35 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         setActiveModuleForLesson(null);
         loadSyllabus();
       } else {
-        alert(res.error || 'Failed to create lesson.');
+        showAlert('Error', res.error || 'Failed to create lesson.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setAddingLesson(false);
     }
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm('Are you sure you want to delete this lesson?')) {
-      return;
-    }
-    try {
-      const res = await courseService.deleteLesson(lessonId);
-      if (res.success) {
-        loadSyllabus();
-      } else {
-        alert(res.error || 'Failed to delete lesson.');
+    showConfirm({
+      title: 'Delete Lesson',
+      message: 'Are you sure you want to delete this lesson?',
+      type: 'danger',
+      confirmLabel: 'Delete Lesson',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const res = await courseService.deleteLesson(lessonId);
+          if (res.success) {
+            loadSyllabus();
+          } else {
+            showAlert('Error', res.error || 'Failed to delete lesson.', 'danger');
+          }
+        } catch (err: any) {
+          showAlert('Error', err.message || 'An error occurred.', 'danger');
+        }
       }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred.');
-    }
+    });
   };
 
   // Create Quiz Form
@@ -425,10 +482,10 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         setShowAddQuizModal(false);
         loadAssessments();
       } else {
-        alert(res.error || 'Failed to create quiz.');
+        showAlert('Error', res.error || 'Failed to create quiz.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setAddingQuiz(false);
     }
@@ -440,7 +497,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
     if (!activeQuizForQuestion || !questionText) return;
     // Check options are filled
     if (questionOptions.some((o) => !o)) {
-      alert('Please fill out all 4 MCQ options.');
+      showAlert('Validation Error', 'Please fill out all 4 MCQ options.', 'warning');
       return;
     }
     try {
@@ -484,10 +541,10 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         setShowAddAssignmentModal(false);
         loadAssessments();
       } else {
-        alert(res.error || 'Failed to create assignment.');
+        showAlert('Error', res.error || 'Failed to create assignment.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setAddingAssignment(false);
     }
@@ -504,7 +561,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
         feedback: feedbackText || null,
       });
       if (res.success) {
-        alert('Grade saved successfully!');
+        showAlert('Success', 'Grade saved successfully!', 'info');
         setGradingSubmission(null);
         setGradeValue('');
         setFeedbackText('');
@@ -516,10 +573,10 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
           }
         }
       } else {
-        alert(res.error || 'Failed to grade submission.');
+        showAlert('Error', res.error || 'Failed to grade submission.', 'danger');
       }
     } catch (err: any) {
-      alert(err.message || 'An error occurred.');
+      showAlert('Error', err.message || 'An error occurred.', 'danger');
     } finally {
       setSavingGrade(false);
     }
@@ -794,7 +851,7 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-400 uppercase">Level</label>
                       <select
@@ -819,6 +876,19 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
                         <option value="PRIVATE">Private</option>
                         <option value="UPCOMING">Upcoming</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Price (MMK)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs outline-none focus:border-[#0d9488] text-slate-700"
+                        required
+                      />
                     </div>
                   </div>
 
@@ -1002,13 +1072,13 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
                           const o3 = prompt('Enter Option 3:');
                           const o4 = prompt('Enter Option 4:');
                           if (!o1 || !o2 || !o3 || !o4) {
-                            alert('All 4 options must be defined.');
+                            showAlert('Validation Error', 'All 4 options must be defined.', 'warning');
                             return;
                           }
                           const correctIdx = prompt('Enter correct Option Index (1, 2, 3, or 4):');
                           const idx = Number(correctIdx) - 1;
                           if (isNaN(idx) || idx < 0 || idx > 3) {
-                            alert('Invalid correct index.');
+                            showAlert('Validation Error', 'Invalid correct index.', 'warning');
                             return;
                           }
 
@@ -1481,6 +1551,18 @@ export default function CourseEditPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       )}
+      {/* Reusable Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        type={confirmConfig.type}
+        confirmOnly={confirmConfig.confirmOnly}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={closeConfirm}
+      />
     </div>
   );
 }

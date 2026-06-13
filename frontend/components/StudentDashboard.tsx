@@ -9,6 +9,7 @@ import { MessagesPanel } from './MessagesPanel';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDateString } from '@/utils/date';
 import authService from '@/services/authService';
+import ConfirmModal from './ConfirmModal';
 
 interface StudentDashboardProps {
   user: UserProfile;
@@ -37,6 +38,52 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
   const { logout, refreshProfile, settings } = useAuth();
   const [activeTab, setActiveTab] = useState<StudentTab>('dashboard');
   const [showMobileMoreMenu, setShowMobileMoreMenu] = useState(false);
+
+  // Custom Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmOnly?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmOnly: false,
+    onConfirm: () => {}
+  });
+
+  const showConfirm = (config: Omit<typeof confirmConfig, 'isOpen'>) => {
+    setConfirmConfig({
+      ...config,
+      isOpen: true
+    });
+  };
+
+  const closeConfirm = () => {
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const showAlert = (title: string, message: string, type: 'info' | 'warning' | 'danger' = 'info') => {
+    setConfirmConfig({
+      title,
+      message,
+      type,
+      confirmLabel: 'OK',
+      confirmOnly: true,
+      isOpen: true,
+      onConfirm: () => closeConfirm(),
+    });
+  };
+
+  // Shadow window.alert to automatically use our custom modal
+  const alert = (message: string) => {
+    showAlert('System Notification', message, 'info');
+  };
 
   // Enrollment data
   const [enrollments, setEnrollments] = useState<EnrolledCourse[]>([]);
@@ -789,7 +836,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
           <div className="px-5 py-5 border-b border-slate-100">
             <div className="flex items-center">
               <span className="font-bold tracking-wide text-slate-800 text-sm">
-                {settings?.lmsName || 'Aegis Academy'}
+                {settings?.lmsName || 'Nexora Academy'}
               </span>
             </div>
           </div>
@@ -945,6 +992,18 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
             </div>
           </div>
         )}
+        {/* Reusable Confirmation Modal */}
+        <ConfirmModal
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmLabel={confirmConfig.confirmLabel}
+          cancelLabel={confirmConfig.cancelLabel}
+          type={confirmConfig.type}
+          confirmOnly={confirmConfig.confirmOnly}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={closeConfirm}
+        />
       </main>
     </div>
   );

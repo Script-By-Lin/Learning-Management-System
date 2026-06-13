@@ -19,8 +19,8 @@ export const config = {
 
 // Validate critical variables on startup in production
 if (process.env.NODE_ENV === 'production') {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is missing.');
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    console.warn('WARNING: Supabase URL or Anon Key is missing in environment variables!');
   }
   if (!process.env.JWT_SECRET) {
     console.warn('WARNING: JWT_SECRET environment variable is missing. Using fallback!');

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d9488;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <!-- Background Rounded Rect -->
+  <rect width="512" height="512" rx="128" fill="#0f172a" />
+  
+  <!-- Graphic Group with Drop Shadow -->
+  <g filter="url(#shadow)" transform="translate(64, 64)">
+    <!-- Shield Shape -->
+    <path d="M192,40 L344,80 C344,220 280,300 192,340 C104,300 40,220 40,80 L192,40 Z" fill="url(#grad1)" />
+    <!-- Inner Shield Contrast Accent -->
+    <path d="M192,60 L320,95 C320,210 266,280 192,315 C118,280 64,210 64,95 L192,60 Z" fill="#1e293b" opacity="0.85" />
+    
+    <!-- Graduation Cap Diamond -->
+    <polygon points="192,100 270,135 192,170 114,135" fill="#ffffff" />
+    <!-- Cap Skullcap Base -->
+    <path d="M140,150 L140,180 C140,200 244,200 244,180 L244,150" fill="#ffffff" opacity="0.9" />
+    <!-- Tassel Cord -->
+    <path d="M192,135 L120,165 L120,195" stroke="#fbbf24" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <circle cx="120" cy="198" r="5" fill="#fbbf24" />
+    
+    <!-- Open Book / Wings of Knowledge -->
+    <path d="M110,235 Q192,255 192,225 Q192,255 274,235 C280,260 244,280 192,280 C140,280 104,260 110,235 Z" fill="#ffffff" />
+  </g>
+</svg>
